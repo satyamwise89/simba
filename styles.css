@@ -58,6 +58,7 @@ a {
 .page-shell {
   width: min(100% - 32px, var(--max-width));
   margin: 0 auto 40px;
+  position: relative;
 }
 
 .site-header {
@@ -79,6 +80,10 @@ a {
   box-shadow:
     0 20px 44px rgba(16, 28, 23, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.site-header::before {
+  content: none;
 }
 
 .floating-logo {
@@ -1423,6 +1428,14 @@ h2,
   border-bottom-right-radius: 6px;
 }
 
+.support-chat-message-admin {
+  justify-self: start;
+  color: #173229;
+  background: linear-gradient(135deg, rgba(206, 233, 221, 0.98), rgba(190, 221, 208, 0.95));
+  border: 1px solid rgba(93, 133, 117, 0.16);
+  border-bottom-left-radius: 6px;
+}
+
 .support-chat-author {
   display: block;
   margin-bottom: 6px;
@@ -1438,6 +1451,10 @@ h2,
 
 .support-chat-message-user .support-chat-author {
   color: rgba(255, 255, 255, 0.72);
+}
+
+.support-chat-message-admin .support-chat-author {
+  color: #33594b;
 }
 
 .support-chat-message-typing {
@@ -1505,6 +1522,13 @@ h2,
   background: rgba(255, 255, 255, 0.92);
   font: inherit;
   color: var(--text);
+}
+
+.support-chat-input:disabled,
+.support-chat-send:disabled,
+.contact-form button[type="submit"]:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .support-chat-send {
@@ -2278,20 +2302,29 @@ h2,
   }
 
   .floating-logo {
+    position: fixed;
     top: 12px;
     left: 12px;
-    width: 88px;
-    height: 88px;
+    z-index: 40;
+    display: grid;
+    width: 78px;
+    height: 78px;
     padding: 6px;
+    border-radius: 22px;
   }
 
   .brand-text-only {
-    margin-left: 76px;
+    margin-left: 0;
   }
 
   .site-header {
     flex-wrap: wrap;
     border-radius: 0 0 24px 24px;
+    padding-left: 102px;
+  }
+
+  .site-header::before {
+    content: none;
   }
 
   .menu-toggle {
@@ -2342,8 +2375,31 @@ h2,
 }
 
 @media (max-width: 780px) {
+  .floating-logo {
+    top: 10px;
+    left: 10px;
+    width: 68px;
+    height: 68px;
+    padding: 5px;
+    border-radius: 20px;
+  }
+
+  .floating-logo::before {
+    inset: -5px;
+    border-radius: 24px;
+  }
+
+  .floating-logo::after {
+    inset: -9px;
+    border-radius: 28px;
+  }
+
   .brand-text-only {
     margin-left: 0;
+  }
+
+  .site-header {
+    padding-left: 88px;
   }
 
   .brand-text strong {

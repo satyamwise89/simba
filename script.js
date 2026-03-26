@@ -14,6 +14,40 @@ const catalogResultNote = document.querySelector("#catalogResultNote");
 const catalogReset = document.querySelector("#catalogReset");
 const samePageHashLinks = document.querySelectorAll('a[href^="#"]');
 const pageShell = document.querySelector(".page-shell");
+const isLocalPreview =
+  window.location.protocol === "file:" ||
+  ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const apiBaseUrl = String(
+  window.SIMBA_SITE_CONFIG?.apiBaseUrl ||
+    document.documentElement.dataset.apiBaseUrl ||
+    (isLocalPreview ? "http://127.0.0.1:3000" : "")
+)
+  .trim()
+  .replace(/\/+$/, "");
+const buildApiUrl = (path) => `${apiBaseUrl}${path}`;
+const getPageContext = () => {
+  const pathName = window.location.pathname.split("/").filter(Boolean).pop() || "index.html";
+  const pageTitle = document.title.trim() || "Simba Agro Chemicals";
+  return `${pageTitle} | ${pathName}`;
+};
+const escapeSupportHtml = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+const ensureSupportClientId = () => {
+  const storageKey = "simba-support-client-id";
+  const existingId = window.localStorage.getItem(storageKey);
+  if (existingId) return existingId;
+
+  const clientId = `simba-${Math.random().toString(36).slice(2, 10)}${Date.now()
+    .toString(36)
+    .slice(-4)}`;
+  window.localStorage.setItem(storageKey, clientId);
+  return clientId;
+};
 const supportFaq = [
   {
     keywords: ["price", "rate", "mrp", "cost"],
@@ -250,11 +284,66 @@ if (revealItems.length) {
 }
 
 if (contactForm && formNote) {
-  contactForm.addEventListener("submit", (event) => {
+  if (!contactForm.querySelector('[name="company"]')) {
+    const honeypotField = document.createElement("input");
+    honeypotField.type = "text";
+    honeypotField.name = "company";
+    honeypotField.tabIndex = -1;
+    honeypotField.autocomplete = "off";
+    honeypotField.setAttribute("aria-hidden", "true");
+    honeypotField.style.position = "absolute";
+    honeypotField.style.left = "-9999px";
+    honeypotField.style.opacity = "0";
+    contactForm.appendChild(honeypotField);
+  }
+
+  contactForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    formNote.textContent =
-      "Inquiry captured on page. Backend integration can be added next for email or CRM delivery.";
-    contactForm.reset();
+    const submitButton = contactForm.querySelector('button[type="submit"]');
+    const formData = new FormData(contactForm);
+    const payload = {
+      name: String(formData.get("name") || "").trim(),
+      email: String(formData.get("email") || "").trim(),
+      phone: String(formData.get("phone") || "").trim(),
+      product_interest: String(formData.get("subject") || "").trim(),
+      message: String(formData.get("message") || "").trim(),
+      company: String(formData.get("company") || "").trim(),
+      page_context: getPageContext(),
+    };
+
+    if (!payload.name || !payload.email || !payload.message) {
+      formNote.textContent = "Please fill in the required inquiry details first.";
+      return;
+    }
+
+    formNote.textContent = "Sending your inquiry to Simba support...";
+    submitButton?.setAttribute("disabled", "disabled");
+
+    try {
+      const response = await fetch(buildApiUrl("/api/contact/submit"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Unable to submit inquiry right now.");
+      }
+
+      formNote.textContent =
+        result.message ||
+        "Thank you. Your inquiry has been sent successfully and the team will connect with you shortly.";
+      contactForm.reset();
+    } catch (error) {
+      formNote.textContent =
+        error.message ||
+        "Inquiry could not be submitted right now. Please try again or use WhatsApp support.";
+    } finally {
+      submitButton?.removeAttribute("disabled");
+    }
   });
 }
 
@@ -632,13 +721,29 @@ if (!document.querySelector(".support-chat-widget")) {
   const form = supportWidget.querySelector(".support-chat-form");
   const input = supportWidget.querySelector(".support-chat-input");
   const quickActions = supportWidget.querySelectorAll("[data-quick-message]");
+  const supportClientId = ensureSupportClientId();
+  const renderedMessageIds = new Set();
+  let supportPollTimer = 0;
+  let supportSessionId = "";
+  let supportSessionReady = false;
+  let supportFallbackNoticeShown = false;
 
   const pushMessage = (author, text, options = {}) => {
+    if (options.id && renderedMessageIds.has(options.id)) {
+      return null;
+    }
+
+    if (options.id) {
+      renderedMessageIds.add(options.id);
+    }
+
+    const authorLabel =
+      author === "admin" ? "Simba Team" : author === "bot" ? "Simba" : "You";
     const bubble = document.createElement("article");
     bubble.className = `support-chat-message support-chat-message-${author}`;
     bubble.innerHTML = `
-      <span class="support-chat-author">${author === "bot" ? "Simba" : "You"}</span>
-      <p>${text}</p>
+      <span class="support-chat-author">${authorLabel}</span>
+      <p>${escapeSupportHtml(text)}</p>
     `;
 
     if (options.typing) {
@@ -656,6 +761,15 @@ if (!document.querySelector(".support-chat-widget")) {
     messages.appendChild(bubble);
     messages.scrollTop = messages.scrollHeight;
     return bubble;
+  };
+
+  const renderServerMessages = (messageList = []) => {
+    messageList.forEach((message) => {
+      if (!message?.id || !message?.text) return;
+      pushMessage(message.sender === "admin" ? "admin" : "user", message.text, {
+        id: message.id,
+      });
+    });
   };
 
   const findReply = (message) => {
@@ -677,15 +791,138 @@ if (!document.querySelector(".support-chat-widget")) {
     }, 950);
   };
 
-  const openSupportChat = () => {
+  const showSupportFallback = (message) => {
+    if (supportFallbackNoticeShown) return;
+    supportFallbackNoticeShown = true;
+    pushMessage(
+      "bot",
+      message ||
+        "Live support abhi connect nahi ho pa raha. Aap message try kar sakte hain, ya WhatsApp escalation use kijiye."
+    );
+  };
+
+  const ensureSupportSession = async () => {
+    if (supportSessionReady) return true;
+
+    try {
+      const response = await fetch(buildApiUrl("/api/chat/session"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: supportClientId,
+          page_context: getPageContext(),
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Unable to start support chat.");
+      }
+
+      supportSessionReady = true;
+      supportSessionId = result.session_id || supportSessionId;
+      renderServerMessages(result.messages);
+      return true;
+    } catch {
+      showSupportFallback();
+      return false;
+    }
+  };
+
+  const pollSupportMessages = async () => {
+    if (!supportSessionReady) return;
+
+    try {
+      const response = await fetch(
+        `${buildApiUrl("/api/chat/messages")}?client_id=${encodeURIComponent(supportClientId)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Unable to fetch support replies.");
+      }
+
+      supportSessionId = result.session_id || supportSessionId;
+      renderServerMessages(result.messages);
+    } catch {
+      showSupportFallback("Telegram support temporarily unavailable hai. WhatsApp ya contact form bhi use kar sakte hain.");
+    }
+  };
+
+  const startSupportPolling = () => {
+    if (supportPollTimer) return;
+    supportPollTimer = window.setInterval(pollSupportMessages, 4000);
+  };
+
+  const stopSupportPolling = () => {
+    if (!supportPollTimer) return;
+    window.clearInterval(supportPollTimer);
+    supportPollTimer = 0;
+  };
+
+  const sendSupportMessage = async (message) => {
+    const pendingBubble = pushMessage("user", message);
+    input?.setAttribute("disabled", "disabled");
+
+    const ready = await ensureSupportSession();
+    if (!ready) {
+      input?.removeAttribute("disabled");
+      sendBotReply(message);
+      return;
+    }
+
+    try {
+      const response = await fetch(buildApiUrl("/api/chat/message"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: supportClientId,
+          page_context: getPageContext(),
+          message,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "Unable to send support message.");
+      }
+
+      pendingBubble?.remove();
+      supportSessionId = result.session_id || supportSessionId;
+      renderServerMessages(result.messages);
+      startSupportPolling();
+    } catch {
+      pendingBubble?.remove();
+      showSupportFallback("Message send nahi ho paya. Aap dubara try kijiye ya WhatsApp escalation use kijiye.");
+      sendBotReply(message);
+    } finally {
+      input?.removeAttribute("disabled");
+      input?.focus();
+    }
+  };
+
+  const openSupportChat = async () => {
     panel.hidden = false;
     supportWidget.classList.add("open");
     launcher.setAttribute("aria-expanded", "true");
     if (!messages.childElementCount) {
       pushMessage(
         "bot",
-        "Namaste! Main Simba support assistant hoon. Product info, pricing, bulk inquiry, ya contact help ke liye message bhejiye."
+        "Namaste! Main Simba support desk hoon. Aapka message team ko Telegram par live deliver hoga."
       );
+    }
+    const ready = await ensureSupportSession();
+    if (ready) {
+      startSupportPolling();
+      await pollSupportMessages();
     }
     window.setTimeout(() => input?.focus(), 120);
   };
@@ -694,6 +931,7 @@ if (!document.querySelector(".support-chat-widget")) {
     supportWidget.classList.remove("open");
     launcher.setAttribute("aria-expanded", "false");
     panel.hidden = true;
+    stopSupportPolling();
   };
 
   launcher.addEventListener("click", () => {
@@ -706,23 +944,21 @@ if (!document.querySelector(".support-chat-widget")) {
 
   closeButton?.addEventListener("click", closeSupportChat);
 
-  form?.addEventListener("submit", (event) => {
+  form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = input?.value.trim();
     if (!message) return;
 
-    pushMessage("user", message);
     input.value = "";
-    sendBotReply(message);
+    await sendSupportMessage(message);
   });
 
   quickActions.forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const quickMessage = button.dataset.quickMessage;
       if (!quickMessage) return;
-      openSupportChat();
-      pushMessage("user", quickMessage);
-      sendBotReply(quickMessage);
+      await openSupportChat();
+      await sendSupportMessage(quickMessage);
     });
   });
 }
