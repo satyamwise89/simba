@@ -552,6 +552,52 @@ h2,
   background: rgba(255, 255, 255, 0.72);
 }
 
+.cta-image-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(240px, 42vw);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 18px 36px rgba(18, 35, 29, 0.18);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+
+.cta-image-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.28), transparent 58%);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: scale(0.86);
+  pointer-events: none;
+}
+
+.cta-image-button img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cta-image-button:hover,
+.cta-image-button:focus-visible {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 24px 44px rgba(18, 35, 29, 0.22);
+}
+
+.cta-image-button:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 10px 20px rgba(18, 35, 29, 0.18);
+  filter: saturate(1.05);
+}
+
+.cta-image-button:active::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
 .hero-metrics,
 .detail-grid,
 .product-hub-grid {
