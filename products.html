@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Products | Simba Agro Chemicals Pvt. Ltd.</title>
+    <meta
+      name="description"
+      content="Explore category-wise product catalog for Simba Agro Chemicals Pvt. Ltd."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="floating-logo" href="index.html" aria-label="Simba Agro Chemicals home">
+      <img class="floating-logo-image" src="simba-logo.png" alt="SIMBA AGRO CHEMICALS PVT. LTD. logo" />
+      <span class="floating-logo-shine" aria-hidden="true"></span>
+    </a>
+
+    <div class="page-shell">
+      <header class="site-header">
+        <div class="brand-text brand-text-only">
+          <strong>SIMBA</strong>
+          <small>AGRO CHEMICALS PVT. LTD.</small>
+        </div>
+
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav-list">
+          Menu
+        </button>
+
+        <nav class="site-nav" aria-label="Primary navigation">
+          <ul id="nav-list">
+            <li class="has-dropdown">
+              <a href="index.html">Home</a>
+              <ul class="dropdown-menu">
+                <li><a href="index.html#about-us">About Us</a></li>
+                <li><a href="index.html#facility">Infrastructure</a></li>
+                <li><a href="index.html#quality">Quality Focus</a></li>
+              </ul>
+            </li>
+            <li class="has-dropdown">
+              <a href="products.html">Products</a>
+              <ul class="dropdown-menu">
+                <li><a href="#insecticides">Insecticides</a></li>
+                <li><a href="#herbicides">Herbicides</a></li>
+                <li><a href="#fungicides">Fungicides</a></li>
+                <li><a href="#pgrs">PGRs</a></li>
+              </ul>
+            </li>
+            <li><a href="index.html#facility">Facility</a></li>
+            <li><a href="index.html#quality">Quality</a></li>
+            <li class="has-dropdown">
+              <a href="index.html#contact">Contact</a>
+              <ul class="dropdown-menu">
+                <li>
+                  <a href="https://wa.me/917905496176" target="_blank" rel="noreferrer"
+                    >WhatsApp Us</a
+                  >
+                </li>
+                <li><a href="mailto:info@simbaagro.com">Email Inquiry</a></li>
+                <li><a href="index.html#contact">Visit Address</a></li>
+              </ul>
+            </li>
+          </ul>
+        </nav>
+      </header>
+
+      <main class="product-hub">
+        <div class="product-hub-intro reveal">
+          <p class="eyebrow">Product catalog</p>
+          <h2>Product details are now rendered directly from the source product data.</h2>
+          <p>
+            Explore Simba Agro Chemicals Pvt. Ltd. product range category-wise with organized
+            specifications, packing options, and commercial information.
+          </p>
+        </div>
+
+        <section class="products-copy-panel reveal">
+          <p>
+            This page now loads products from the central catalog data so numbering and ordering
+            stay consistent across categories.
+          </p>
+        </section>
+
+        <section class="catalog-tools reveal" aria-label="Catalog tools">
+          <div class="catalog-tools-grid">
+            <label class="catalog-search-field">
+              <span>Search product</span>
+              <input
+                type="search"
+                id="catalogSearch"
+                placeholder="Search by name, ingredient, or product number"
+              />
+            </label>
+
+            <label class="catalog-filter-field">
+              <span>Filter by rating</span>
+              <select id="starFilter">
+                <option value="all">All products</option>
+                <option value="5 STAR">5 Star</option>
+                <option value="4 STAR">4 Star</option>
+                <option value="3 STAR">3 Star</option>
+              </select>
+            </label>
+
+            <label class="catalog-filter-field">
+              <span>Jump to category</span>
+              <select id="categoryFilter">
+                <option value="all">All categories</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="catalog-tools-bar">
+            <p class="catalog-result-note" id="catalogResultNote">
+              Browse all listed products category-wise.
+            </p>
+            <button class="button button-secondary catalog-reset" id="catalogReset" type="button">
+              Reset filters
+            </button>
+          </div>
+        </section>
+
+        <nav class="catalog-nav reveal" id="productCategoryNav" aria-label="Product categories"></nav>
+
+        <section class="catalog-shell" id="productsCatalog" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <script src="products-data.js"></script>
+    <script src="product-rich-data.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
