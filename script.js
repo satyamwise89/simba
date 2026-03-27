@@ -301,11 +301,14 @@ if (contactForm && formNote) {
     event.preventDefault();
     const submitButton = contactForm.querySelector('button[type="submit"]');
     const formData = new FormData(contactForm);
+    const requirementType = String(formData.get("requirement_type") || "").trim();
+    const requirementSubject = String(formData.get("subject") || "").trim();
+    const productInterest = [requirementType, requirementSubject].filter(Boolean).join(" | ");
     const payload = {
       name: String(formData.get("name") || "").trim(),
       email: String(formData.get("email") || "").trim(),
       phone: String(formData.get("phone") || "").trim(),
-      product_interest: String(formData.get("subject") || "").trim(),
+      product_interest: productInterest || requirementType || requirementSubject || "General Inquiry",
       message: String(formData.get("message") || "").trim(),
       company: String(formData.get("company") || "").trim(),
       page_context: getPageContext(),
