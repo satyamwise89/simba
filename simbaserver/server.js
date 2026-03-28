@@ -600,9 +600,33 @@ app.get("/api/health", (req, res) => {
     });
 });
 
+function schedulePeerPing({ url, initialDelayMs, intervalMs }) {
+    const sendPing = async () => {
+        try {
+            const response = await fetch(url, { method: "GET", cache: "no-store" });
+            if (!response.ok) {
+                throw new Error(`Ping failed with status ${response.status}`);
+            }
+        } catch {
+            // Silent fail to avoid noisy logs in production.
+        }
+    };
+
+    setTimeout(() => {
+        sendPing();
+        setInterval(sendPing, intervalMs);
+    }, initialDelayMs);
+}
+
 const port = Number(process.env.PORT || 3000);
 app.listen(port, () => {
     console.log(`Simba server running on http://127.0.0.1:${port}`);
+});
+
+schedulePeerPing({
+    url: "https://rahaseedserver.onrender.com/api/health",
+    initialDelayMs: 60 * 1000,
+    intervalMs: 3 * 60 * 1000
 });
 
 setInterval(() => {
