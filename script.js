@@ -68,7 +68,7 @@ const supportFaq = [
   {
     keywords: ["contact", "call", "phone", "email"],
     reply:
-      "Aap humein WhatsApp par +91 79054 96176 ya email info@simbaagro.com par directly reach kar sakte hain.",
+      "Aap humein WhatsApp par +91 79054 96176 ya email support@simbagrochemicals.com par directly reach kar sakte hain.",
   },
 ];
 
@@ -150,6 +150,50 @@ const productNameAliases = {
   VOLZOLPLUS: "VOLZOL",
 };
 
+const catalogCategorySlugs = new Set(["insecticides", "herbicides", "fungicides", "pgrs"]);
+
+const featuredCatalogPreviewMap = {
+  CHLOROGOLD: { src: "images/landing/featured-chloro-gold.jpeg", title: "CHLORO GOLD" },
+  MESOWIN: { src: "images/landing/featured-mesotop.jpeg", title: "MESOTOP" },
+  VOLZOL: { src: "images/landing/featured-volzol-v2.jpeg", title: "VOLZOL" },
+  ECOFORCE: { src: "images/landing/featured-planofix.jpeg", title: "PLANOFIX" },
+};
+
+const sanitizeCatalogPreviewImagePath = (value = "") => {
+  const trimmedValue = String(value).trim();
+  if (/^images\/[a-z0-9/_\-.]+$/i.test(trimmedValue)) return trimmedValue;
+  return "";
+};
+
+const getCatalogProductRequest = () => {
+  if (!productsCatalog) return null;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const requestedProduct = String(searchParams.get("product") || "").trim();
+  const productKey = normalizeProductKey(requestedProduct);
+  let categorySlug = String(searchParams.get("category") || "")
+    .trim()
+    .toLowerCase();
+  const hashSlug = window.location.hash.replace(/^#/, "").trim().toLowerCase();
+
+  if (!categorySlug && catalogCategorySlugs.has(hashSlug)) {
+    categorySlug = hashSlug;
+  }
+
+  if (categorySlug && !catalogCategorySlugs.has(categorySlug)) {
+    categorySlug = "";
+  }
+
+  if (!productKey && !categorySlug) return null;
+
+  return {
+    productKey,
+    categorySlug,
+    previewImage: sanitizeCatalogPreviewImagePath(searchParams.get("previewImage")),
+    previewTitle: String(searchParams.get("previewTitle") || requestedProduct).trim(),
+  };
+};
+
 const brandProductTitles = (titles) => {
   titles.forEach((title) => {
     if (title.querySelector(".sim-prefix")) return;
@@ -158,6 +202,34 @@ const brandProductTitles = (titles) => {
     const brandedText = originalText.replace(/^Sim-/i, "").trim();
     title.innerHTML = `<span class="product-brandline"><span class="sim-prefix">SIM</span><span class="sim-hyphen">-</span><span class="sim-product-name">${brandedText}</span></span>`;
   });
+};
+
+const setActiveCatalogCategory = (targetId) => {
+  if (!targetId) return false;
+
+  const categoryBlocks = document.querySelectorAll(".category-block");
+  if (!categoryBlocks.length) return false;
+
+  let hasMatch = false;
+
+  categoryBlocks.forEach((block) => {
+    const isActive = block.id === targetId;
+    hasMatch = hasMatch || isActive;
+    block.classList.toggle("category-hidden", !isActive);
+    block.classList.toggle("category-active", isActive);
+
+    block.querySelectorAll(".product-entry").forEach((entry) => {
+      entry.open = isActive;
+    });
+  });
+
+  if (!hasMatch) return false;
+
+  productCategoryNav?.querySelectorAll(".category-media-card").forEach((card) => {
+    card.classList.toggle("active", card.dataset.target === targetId);
+  });
+
+  return true;
 };
 
 const initializeCategoryCards = () => {
@@ -173,26 +245,12 @@ const initializeCategoryCards = () => {
   };
 
   productCategoryNav.innerHTML = "";
+  let firstCategoryId = "";
 
-  const openCategory = (targetId) => {
-    categoryBlocks.forEach((block) => {
-      const isActive = block.id === targetId;
-      block.classList.toggle("category-hidden", !isActive);
-      block.classList.toggle("category-active", isActive);
-
-      block.querySelectorAll(".product-entry").forEach((entry) => {
-        entry.open = isActive;
-      });
-    });
-
-    productCategoryNav.querySelectorAll(".category-media-card").forEach((card) => {
-      card.classList.toggle("active", card.dataset.target === targetId);
-    });
-  };
-
-  categoryBlocks.forEach((block, index) => {
+  categoryBlocks.forEach((block) => {
     const config = categoryImages[block.id];
     if (!config) return;
+    if (!firstCategoryId) firstCategoryId = block.id;
 
     const mediaCard = document.createElement("button");
     mediaCard.className = "category-media-card";
@@ -210,23 +268,16 @@ const initializeCategoryCards = () => {
     `;
 
     mediaCard.addEventListener("click", () => {
-      openCategory(block.id);
+      setActiveCatalogCategory(block.id);
       block.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
     productCategoryNav.appendChild(mediaCard);
-
-    if (index !== 0) {
-      block.classList.add("category-hidden");
-      return;
-    }
-
-    block.classList.add("category-active");
-    block.querySelectorAll(".product-entry").forEach((entry) => {
-      entry.open = true;
-    });
-    mediaCard.classList.add("active");
   });
+
+  if (firstCategoryId) {
+    setActiveCatalogCategory(firstCategoryId);
+  }
 };
 
 const isMobileMenuViewport = () => window.innerWidth <= 980;
@@ -444,6 +495,12 @@ if (productsCatalog && window.PRODUCTS_DATA?.categories) {
     `;
   }
 
+  let pendingCatalogRequest = getCatalogProductRequest();
+
+  if (pendingCatalogRequest?.categorySlug && categoryFilter) {
+    categoryFilter.value = pendingCatalogRequest.categorySlug;
+  }
+
   const renderVariantRows = (variants) =>
     variants
       .map(
@@ -477,15 +534,70 @@ if (productsCatalog && window.PRODUCTS_DATA?.categories) {
         return technicalKey && (entryNameKey === technicalKey || entryTechnicalKey === technicalKey);
       });
 
-    if (!detailEntry) {
+    const featuredPreview = featuredCatalogPreviewMap[productKey] || null;
+    const featuredTitle =
+      pendingCatalogRequest?.productKey === productKey && pendingCatalogRequest?.previewTitle
+        ? pendingCatalogRequest.previewTitle
+        : featuredPreview?.title || product.name;
+    const previewImage = featuredPreview
+      ? {
+          src: featuredPreview.src,
+          title: featuredTitle,
+          alt: featuredTitle,
+        }
+      : null;
+
+    if (!detailEntry && !previewImage) {
       return "";
     }
 
+    const previewMarkup = previewImage
+      ? `
+        <figure class="rich-product-media">
+          <img src="${escapeSupportHtml(previewImage.src)}" alt="${escapeSupportHtml(
+          previewImage.alt || product.name
+        )}" loading="lazy" />
+          <figcaption>${escapeSupportHtml(previewImage.title || product.name)}</figcaption>
+        </figure>
+      `
+      : "";
+    const detailMarkup = detailEntry?.detailHtml
+      ? `<div class="rich-product-copy detail-html">${detailEntry.detailHtml}</div>`
+      : "";
+
     return `
       <div class="rich-product-body">
-        <div class="rich-product-copy detail-html">${detailEntry.detailHtml || ""}</div>
+        ${previewMarkup}
+        ${detailMarkup}
       </div>
     `;
+  };
+
+  const focusCatalogProduct = (request) => {
+    if (!request?.productKey) return false;
+
+    const categoryScope = request.categorySlug
+      ? productsCatalog.querySelector(`.category-block#${request.categorySlug}`)
+      : productsCatalog;
+    const targetEntry = categoryScope?.querySelector(
+      `.product-entry[data-product-key="${request.productKey}"]`
+    );
+
+    if (!targetEntry) return false;
+
+    const categoryBlock = targetEntry.closest(".category-block");
+    if (categoryBlock?.id) {
+      setActiveCatalogCategory(categoryBlock.id);
+    }
+
+    targetEntry.open = true;
+    targetEntry.classList.add("product-entry-focus");
+    window.setTimeout(() => targetEntry.classList.remove("product-entry-focus"), 1800);
+    window.requestAnimationFrame(() => {
+      targetEntry.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return true;
   };
 
   const renderCatalog = (visibleCategories) => {
@@ -524,7 +636,9 @@ if (productsCatalog && window.PRODUCTS_DATA?.categories) {
               ${category.products
                 .map(
                   (product, index) => `
-                    <details class="product-entry"${index === 0 ? " open" : ""}>
+                    <details class="product-entry" data-product-key="${normalizeProductKey(
+                      product.name
+                    )}"${index === 0 ? " open" : ""}>
                       <summary>
                         <span class="product-index">${product.srNo || "-"}</span>
                         <span class="product-meta">
@@ -566,6 +680,19 @@ if (productsCatalog && window.PRODUCTS_DATA?.categories) {
 
     brandProductTitles(productsCatalog.querySelectorAll(".product-meta strong"));
     initializeCategoryCards();
+
+    if (pendingCatalogRequest?.productKey) {
+      const focusApplied = focusCatalogProduct(pendingCatalogRequest);
+      if (focusApplied) {
+        pendingCatalogRequest = null;
+      }
+    } else if (pendingCatalogRequest?.categorySlug) {
+      const categoryApplied = setActiveCatalogCategory(pendingCatalogRequest.categorySlug);
+      if (categoryApplied) {
+        pendingCatalogRequest = null;
+      }
+    }
+
     updateResultNote(visibleCategories);
   };
 
@@ -646,6 +773,10 @@ if (samePageHashLinks.length) {
       const target = document.querySelector(href);
       if (!target) return;
 
+      if (target.classList.contains("category-block")) {
+        setActiveCatalogCategory(target.id);
+      }
+
       event.preventDefault();
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -691,11 +822,11 @@ if (pageShell && !document.querySelector(".site-footer")) {
       <section class="footer-contact">
         <h3>Contact</h3>
         <a href="https://wa.me/917905496176" target="_blank" rel="noreferrer">+91 79054 96176</a>
-        <a href="mailto:info@simbaagro.com">info@simbaagro.com</a>
+        <a href="mailto:support@simbagrochemicals.com">support@simbagrochemicals.com</a>
         <p>K-II/67-B First Floor Block K-II Gali No 2 Sangam Vihar, Delhi 110080</p>
         <div class="footer-socials">
           <a href="https://wa.me/917905496176" target="_blank" rel="noreferrer">WhatsApp</a>
-          <a href="mailto:info@simbaagro.com">Email</a>
+          <a href="mailto:support@simbagrochemicals.com">Email</a>
         </div>
       </section>
     </div>
@@ -1010,3 +1141,4 @@ if (!document.querySelector(".support-chat-widget")) {
     });
   });
 }
+
